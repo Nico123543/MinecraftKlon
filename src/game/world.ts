@@ -18,13 +18,13 @@ interface ChunkRuntime {
   cz: number;
   blocks: Uint16Array;
   solidMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> | null;
-  waterMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial> | null;
+  waterSurfaceMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial> | null;
   lavaMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhongMaterial> | null;
   floraMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> | null;
   modified: boolean;
   needsRemesh: boolean;
   quadCount: number;
-  waterQuadCenters: Float32Array | null;
+  waterSurfaceQuadCenters: Float32Array | null;
   lavaQuadCenters: Float32Array | null;
 }
 
@@ -125,6 +125,7 @@ export class VoxelWorld {
   private waterTransparencyEnabled = true;
   private waterShineEnabled = true;
   private waterPulseEnabled = true;
+  private waterSurfaceLayerEnabled = true;
   private waterSortingEnabled = false;
   private waterDepthWriteEnabled = true;
   private lastTransparencySortX = Number.NaN;
@@ -212,8 +213,17 @@ export class VoxelWorld {
   setWaterEnabled(enabled: boolean): void {
     this.waterEnabled = enabled;
     for (const chunk of this.chunks.values()) {
-      if (chunk.waterMesh) {
-        chunk.waterMesh.visible = enabled;
+      if (chunk.waterSurfaceMesh) {
+        chunk.waterSurfaceMesh.visible = enabled && this.waterSurfaceLayerEnabled;
+      }
+    }
+  }
+
+  setWaterSurfaceLayerEnabled(enabled: boolean): void {
+    this.waterSurfaceLayerEnabled = enabled;
+    for (const chunk of this.chunks.values()) {
+      if (chunk.waterSurfaceMesh) {
+        chunk.waterSurfaceMesh.visible = this.waterEnabled && enabled;
       }
     }
   }
@@ -237,7 +247,7 @@ export class VoxelWorld {
     this.waterSortingEnabled = enabled;
     if (enabled) {
       for (const chunk of this.chunks.values()) {
-        if (chunk.waterMesh) {
+        if (chunk.waterSurfaceMesh) {
           this.pendingFaceSortChunks.add(chunk.key);
         }
       }
@@ -374,13 +384,13 @@ export class VoxelWorld {
           cz,
           blocks,
           solidMesh: null,
-          waterMesh: null,
+          waterSurfaceMesh: null,
           lavaMesh: null,
           floraMesh: null,
           modified: true,
           needsRemesh: false,
           quadCount: 0,
-          waterQuadCenters: null,
+          waterSurfaceQuadCenters: null,
           lavaQuadCenters: null
         };
         this.chunks.set(key, chunk);
@@ -410,13 +420,13 @@ export class VoxelWorld {
           cz,
           blocks: result.blocks,
           solidMesh: null,
-          waterMesh: null,
+          waterSurfaceMesh: null,
           lavaMesh: null,
           floraMesh: null,
           modified: false,
           needsRemesh: false,
           quadCount: 0,
-          waterQuadCenters: null,
+          waterSurfaceQuadCenters: null,
           lavaQuadCenters: null
         };
 
@@ -477,7 +487,11 @@ export class VoxelWorld {
   }
 
   private applyMeshToChunk(chunk: ChunkRuntime, result: MeshResult): void {
-    chunk.quadCount = result.solid.quadCount + result.water.quadCount + result.lava.quadCount + result.flora.quadCount;
+    chunk.quadCount =
+      result.solid.quadCount +
+      result.water.quadCount +
+      result.lava.quadCount +
+      result.flora.quadCount;
 
     this.applyLayerMesh(
       chunk,
@@ -489,7 +503,7 @@ export class VoxelWorld {
     );
     this.applyLayerMesh(
       chunk,
-      'water',
+      'waterSurface',
       result.water.positions,
       result.water.normals,
       result.water.colors,
@@ -549,7 +563,7 @@ export class VoxelWorld {
     const maxDistanceSq = maxDistance * maxDistance;
 
     for (const chunk of this.chunks.values()) {
-      if (!chunk.solidMesh && !chunk.waterMesh && !chunk.lavaMesh && !chunk.floraMesh) {
+      if (!chunk.solidMesh && !chunk.waterSurfaceMesh && !chunk.lavaMesh && !chunk.floraMesh) {
         continue;
       }
 
@@ -561,7 +575,7 @@ export class VoxelWorld {
 
       if (distSq > maxDistanceSq) {
         if (chunk.solidMesh) chunk.solidMesh.visible = false;
-        if (chunk.waterMesh) chunk.waterMesh.visible = false;
+        if (chunk.waterSurfaceMesh) chunk.waterSurfaceMesh.visible = false;
         if (chunk.lavaMesh) chunk.lavaMesh.visible = false;
         if (chunk.floraMesh) chunk.floraMesh.visible = false;
         continue;
@@ -570,8 +584,8 @@ export class VoxelWorld {
       if (chunk.solidMesh) {
         chunk.solidMesh.visible = this.isMeshVisible(chunk.solidMesh);
       }
-      if (chunk.waterMesh) {
-        chunk.waterMesh.visible = this.waterEnabled && this.isMeshVisible(chunk.waterMesh);
+      if (chunk.waterSurfaceMesh) {
+        chunk.waterSurfaceMesh.visible = this.waterEnabled && this.waterSurfaceLayerEnabled && this.isMeshVisible(chunk.waterSurfaceMesh);
       }
       if (chunk.lavaMesh) {
         chunk.lavaMesh.visible = this.isMeshVisible(chunk.lavaMesh);
@@ -584,14 +598,20 @@ export class VoxelWorld {
 
   private applyLayerMesh(
     chunk: ChunkRuntime,
-    layer: 'solid' | 'water' | 'lava' | 'flora',
+    layer: 'solid' | 'waterSurface' | 'lava' | 'flora',
     positions: Float32Array,
     normals: Int8Array,
     colors: Uint8Array,
     indices: Uint32Array
   ): void {
     const existing =
-      layer === 'solid' ? chunk.solidMesh : layer === 'water' ? chunk.waterMesh : layer === 'lava' ? chunk.lavaMesh : chunk.floraMesh;
+      layer === 'solid'
+        ? chunk.solidMesh
+        : layer === 'waterSurface'
+          ? chunk.waterSurfaceMesh
+          : layer === 'lava'
+            ? chunk.lavaMesh
+            : chunk.floraMesh;
 
     if (indices.length === 0) {
       if (!existing) {
@@ -601,9 +621,9 @@ export class VoxelWorld {
       existing.geometry.dispose();
       if (layer === 'solid') {
         chunk.solidMesh = null;
-      } else if (layer === 'water') {
-        chunk.waterMesh = null;
-        chunk.waterQuadCenters = null;
+      } else if (layer === 'waterSurface') {
+        chunk.waterSurfaceMesh = null;
+        chunk.waterSurfaceQuadCenters = null;
       } else if (layer === 'lava') {
         chunk.lavaMesh = null;
         chunk.lavaQuadCenters = null;
@@ -617,8 +637,8 @@ export class VoxelWorld {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('normal', new THREE.Int8BufferAttribute(normals, 3, true));
     geometry.setAttribute('color', new THREE.Uint8BufferAttribute(colors, 3, true));
-    if (layer === 'water') {
-      chunk.waterQuadCenters = computeQuadCenters(positions);
+    if (layer === 'waterSurface') {
+      chunk.waterSurfaceQuadCenters = computeQuadCenters(positions);
     } else if (layer === 'lava') {
       chunk.lavaQuadCenters = computeQuadCenters(positions);
     }
@@ -634,14 +654,15 @@ export class VoxelWorld {
         mesh.frustumCulled = true;
         chunk.solidMesh = mesh;
         this.scene.add(mesh);
-      } else if (layer === 'water') {
+      } else if (layer === 'waterSurface') {
         const mesh = new THREE.Mesh(geometry, this.waterMaterial);
         mesh.position.set(chunk.cx * CHUNK_SIZE_X, 0, chunk.cz * CHUNK_SIZE_Z);
         mesh.castShadow = false;
         mesh.receiveShadow = false;
         mesh.frustumCulled = true;
         mesh.renderOrder = 2000;
-        chunk.waterMesh = mesh;
+        mesh.visible = this.waterEnabled && this.waterSurfaceLayerEnabled;
+        chunk.waterSurfaceMesh = mesh;
         this.scene.add(mesh);
       } else if (layer === 'lava') {
         const mesh = new THREE.Mesh(geometry, this.lavaMaterial);
@@ -685,12 +706,12 @@ export class VoxelWorld {
       chunk.solidMesh.geometry.dispose();
       chunk.solidMesh = null;
     }
-    if (chunk.waterMesh) {
-      this.scene.remove(chunk.waterMesh);
-      chunk.waterMesh.geometry.dispose();
-      chunk.waterMesh = null;
+    if (chunk.waterSurfaceMesh) {
+      this.scene.remove(chunk.waterSurfaceMesh);
+      chunk.waterSurfaceMesh.geometry.dispose();
+      chunk.waterSurfaceMesh = null;
     }
-    chunk.waterQuadCenters = null;
+    chunk.waterSurfaceQuadCenters = null;
     if (chunk.lavaMesh) {
       this.scene.remove(chunk.lavaMesh);
       chunk.lavaMesh.geometry.dispose();
@@ -748,7 +769,7 @@ export class VoxelWorld {
     if (movedBlock || movedChunk) {
       const entries: Array<{ distSq: number; chunk: ChunkRuntime }> = [];
       for (const chunk of this.chunks.values()) {
-        if (!chunk.waterMesh && !chunk.lavaMesh) continue;
+        if (!chunk.waterSurfaceMesh && !chunk.lavaMesh) continue;
         const cx = chunk.cx * CHUNK_SIZE_X + CHUNK_SIZE_X * 0.5;
         const cz = chunk.cz * CHUNK_SIZE_Z + CHUNK_SIZE_Z * 0.5;
         const dx = cx - cameraPosition.x;
@@ -759,11 +780,11 @@ export class VoxelWorld {
       entries.sort((a, b) => b.distSq - a.distSq);
       let order = 2000;
       for (const entry of entries) {
-        if (this.waterEnabled && entry.chunk.waterMesh) {
+        if (this.waterEnabled && entry.chunk.waterSurfaceMesh) {
           if (this.waterSortingEnabled) {
-            entry.chunk.waterMesh.renderOrder = order++;
+            entry.chunk.waterSurfaceMesh.renderOrder = order++;
           } else {
-            entry.chunk.waterMesh.renderOrder = 2000;
+            entry.chunk.waterSurfaceMesh.renderOrder = 2000;
           }
         }
         if (entry.chunk.lavaMesh) {
@@ -774,8 +795,8 @@ export class VoxelWorld {
 
     if (!this.waterSortingEnabled) {
       for (const chunk of this.chunks.values()) {
-        if (chunk.waterMesh) {
-          chunk.waterMesh.renderOrder = 2000;
+        if (chunk.waterSurfaceMesh) {
+          chunk.waterSurfaceMesh.renderOrder = 2000;
         }
       }
     }
@@ -806,8 +827,8 @@ export class VoxelWorld {
   }
 
   private sortTransparentFacesInChunk(chunk: ChunkRuntime, cameraPosition: THREE.Vector3): void {
-    if (this.waterSortingEnabled && this.waterEnabled && chunk.waterMesh && chunk.waterQuadCenters) {
-      sortMeshQuadsBackToFront(chunk.waterMesh, chunk.waterQuadCenters, cameraPosition);
+    if (this.waterSortingEnabled && this.waterEnabled && chunk.waterSurfaceMesh && chunk.waterSurfaceQuadCenters) {
+      sortMeshQuadsBackToFront(chunk.waterSurfaceMesh, chunk.waterSurfaceQuadCenters, cameraPosition);
     }
     if (chunk.lavaMesh && chunk.lavaQuadCenters) {
       sortMeshQuadsBackToFront(chunk.lavaMesh, chunk.lavaQuadCenters, cameraPosition);

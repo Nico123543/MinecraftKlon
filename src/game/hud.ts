@@ -19,6 +19,7 @@ interface HudControls {
   onWaterPulseToggle: (enabled: boolean) => void;
   onWaterSortToggle: (enabled: boolean) => void;
   onWaterDepthToggle: (enabled: boolean) => void;
+  onWaterSurfaceLayerToggle: (enabled: boolean) => void;
 }
 
 export class Hud {
@@ -109,6 +110,18 @@ export class Hud {
     });
     waterFogRow.append(waterFogInput);
 
+    const waterSurfaceLayerRow = document.createElement('label');
+    waterSurfaceLayerRow.className = 'control-row';
+    waterSurfaceLayerRow.textContent = 'Layer Top';
+    const waterSurfaceLayerInput = document.createElement('input');
+    waterSurfaceLayerInput.type = 'checkbox';
+    waterSurfaceLayerInput.checked = true;
+    waterSurfaceLayerInput.className = 'water-toggle';
+    waterSurfaceLayerInput.addEventListener('change', () => {
+      controls.onWaterSurfaceLayerToggle(waterSurfaceLayerInput.checked);
+    });
+    waterSurfaceLayerRow.append(waterSurfaceLayerInput);
+
     const waterAlphaRow = document.createElement('label');
     waterAlphaRow.className = 'control-row';
     waterAlphaRow.textContent = 'Alpha';
@@ -182,6 +195,7 @@ export class Hud {
       flyRow,
       waterToggleRow,
       waterFogRow,
+      waterSurfaceLayerRow,
       waterAlphaRow,
       waterShineRow,
       waterPulseRow,

@@ -66,6 +66,9 @@ export class GameApp {
       onWaterFogToggle: (enabled) => {
         this.waterFogEnabled = enabled;
       },
+      onWaterSurfaceLayerToggle: (enabled) => {
+        this.world.setWaterSurfaceLayerEnabled(enabled);
+      },
       onWaterAlphaToggle: (enabled) => {
         this.world.setWaterTransparencyEnabled(enabled);
       },

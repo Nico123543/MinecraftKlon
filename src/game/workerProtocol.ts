@@ -34,11 +34,11 @@ export interface MeshReadyResponse {
   solidColors: ArrayBufferLike;
   solidIndices: ArrayBufferLike;
   solidQuadCount: number;
-  waterPositions: ArrayBufferLike;
-  waterNormals: ArrayBufferLike;
-  waterColors: ArrayBufferLike;
-  waterIndices: ArrayBufferLike;
-  waterQuadCount: number;
+  waterSurfacePositions: ArrayBufferLike;
+  waterSurfaceNormals: ArrayBufferLike;
+  waterSurfaceColors: ArrayBufferLike;
+  waterSurfaceIndices: ArrayBufferLike;
+  waterSurfaceQuadCount: number;
   lavaPositions: ArrayBufferLike;
   lavaNormals: ArrayBufferLike;
   lavaColors: ArrayBufferLike;

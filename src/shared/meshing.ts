@@ -261,6 +261,16 @@ function buildGreedyMeshWithRules(
   };
 }
 
+function packMeshData(positions: number[], normals: number[], colors: number[], indices: number[]): ChunkMeshData {
+  return {
+    positions: new Float32Array(positions),
+    normals: new Int8Array(normals),
+    colors: new Uint8Array(colors),
+    indices: new Uint32Array(indices),
+    quadCount: indices.length / 6
+  };
+}
+
 export function buildGreedyMesh(blocks: Uint16Array): ChunkMeshData {
   return buildGreedyMeshWithRules(blocks, (block) => isSolid(block), (neighbor) => isSolid(neighbor));
 }
@@ -368,17 +378,6 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function waterDepthAt(blocks: Uint16Array, x: number, y: number, z: number): number {
-  let depth = 0;
-  for (let yy = y; yy >= 0; yy--) {
-    if (!isWater(getBlockAt(blocks, x, yy, z))) {
-      break;
-    }
-    depth++;
-  }
-  return depth;
-}
-
 function cornerWaterHeight(blocks: Uint16Array, gx: number, y: number, gz: number): number {
   let sum = 0;
   let count = 0;
@@ -394,28 +393,6 @@ function cornerWaterHeight(blocks: Uint16Array, gx: number, y: number, gz: numbe
         sum += 1.0;
         count++;
       }
-    }
-  }
-
-  if (count === 0) {
-    return 0;
-  }
-  return sum / count;
-}
-
-function cornerWaterDepth(blocks: Uint16Array, gx: number, y: number, gz: number): number {
-  let sum = 0;
-  let count = 0;
-
-  for (let dz = -1; dz <= 0; dz++) {
-    for (let dx = -1; dx <= 0; dx++) {
-      const sx = gx + dx;
-      const sz = gz + dz;
-      if (!isWater(getBlockAt(blocks, sx, y, sz)) && !isWater(getBlockAt(blocks, sx, y + 1, sz))) {
-        continue;
-      }
-      sum += waterDepthAt(blocks, sx, y, sz);
-      count++;
     }
   }
 
@@ -462,10 +439,10 @@ function pushWaterQuad(
 }
 
 function buildWaterSurfaceMesh(blocks: Uint16Array): ChunkMeshData {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
+  const surfacePositions: number[] = [];
+  const surfaceNormals: number[] = [];
+  const surfaceColors: number[] = [];
+  const surfaceIndices: number[] = [];
   const topDrop = WATER_SURFACE_DROP;
   const sideFloorInset = 0.02;
 
@@ -487,10 +464,6 @@ function buildWaterSurfaceMesh(blocks: Uint16Array): ChunkMeshData {
           continue;
         }
 
-        const d00 = cornerWaterDepth(blocks, x, y, z);
-        const d01 = cornerWaterDepth(blocks, x, y, z + 1);
-        const d11 = cornerWaterDepth(blocks, x + 1, y, z + 1);
-        const d10 = cornerWaterDepth(blocks, x + 1, y, z);
         const topDepth = 2.4;
 
         const y00 = y + Math.max(sideFloorInset, h00 - topDrop);
@@ -499,10 +472,10 @@ function buildWaterSurfaceMesh(blocks: Uint16Array): ChunkMeshData {
         const y10 = y + Math.max(sideFloorInset, h10 - topDrop);
 
         pushWaterQuad(
-          positions,
-          normals,
-          colors,
-          indices,
+          surfacePositions,
+          surfaceNormals,
+          surfaceColors,
+          surfaceIndices,
           [
             [x, y00, z],
             [x, y01, z + 1],
@@ -514,97 +487,11 @@ function buildWaterSurfaceMesh(blocks: Uint16Array): ChunkMeshData {
           0,
           [topDepth, topDepth, topDepth, topDepth]
         );
-
-        const westNeighbor = getBlockAt(blocks, x - 1, y, z);
-        if (!isWater(westNeighbor) && !isSolid(westNeighbor)) {
-          pushWaterQuad(
-            positions,
-            normals,
-            colors,
-            indices,
-            [
-              [x, y, z],
-              [x, y, z + 1],
-              [x, y01, z + 1],
-              [x, y00, z]
-            ],
-            -1,
-            0,
-            0,
-            [d00, d01, d01, d00]
-          );
-        }
-
-        const eastNeighbor = getBlockAt(blocks, x + 1, y, z);
-        if (!isWater(eastNeighbor) && !isSolid(eastNeighbor)) {
-          pushWaterQuad(
-            positions,
-            normals,
-            colors,
-            indices,
-            [
-              [x + 1, y, z],
-              [x + 1, y10, z],
-              [x + 1, y11, z + 1],
-              [x + 1, y, z + 1]
-            ],
-            1,
-            0,
-            0,
-            [d10, d10, d11, d11]
-          );
-        }
-
-        const northNeighbor = getBlockAt(blocks, x, y, z - 1);
-        if (!isWater(northNeighbor) && !isSolid(northNeighbor)) {
-          pushWaterQuad(
-            positions,
-            normals,
-            colors,
-            indices,
-            [
-              [x, y, z],
-              [x, y00, z],
-              [x + 1, y10, z],
-              [x + 1, y, z]
-            ],
-            0,
-            0,
-            -1,
-            [d00, d00, d10, d10]
-          );
-        }
-
-        const southNeighbor = getBlockAt(blocks, x, y, z + 1);
-        if (!isWater(southNeighbor) && !isSolid(southNeighbor)) {
-          pushWaterQuad(
-            positions,
-            normals,
-            colors,
-            indices,
-            [
-              [x, y, z + 1],
-              [x + 1, y, z + 1],
-              [x + 1, y11, z + 1],
-              [x, y01, z + 1]
-            ],
-            0,
-            0,
-            1,
-            [d01, d11, d11, d01]
-          );
-        }
       }
     }
   }
 
-  return {
-    positions: new Float32Array(positions),
-    normals: new Int8Array(normals),
-    colors: new Uint8Array(colors),
-    indices: new Uint32Array(indices),
-    quadCount: indices.length / 6
-  };
+  return packMeshData(surfacePositions, surfaceNormals, surfaceColors, surfaceIndices);
 }
 
 export function buildChunkMeshes(blocks: Uint16Array): ChunkMeshBundle {

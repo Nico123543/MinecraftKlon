@@ -201,11 +201,11 @@ export class WorldWorkerPool {
             quadCount: response.solidQuadCount
           },
           water: {
-            positions: new Float32Array(response.waterPositions),
-            normals: new Int8Array(response.waterNormals),
-            colors: new Uint8Array(response.waterColors),
-            indices: new Uint32Array(response.waterIndices),
-            quadCount: response.waterQuadCount
+            positions: new Float32Array(response.waterSurfacePositions),
+            normals: new Int8Array(response.waterSurfaceNormals),
+            colors: new Uint8Array(response.waterSurfaceColors),
+            indices: new Uint32Array(response.waterSurfaceIndices),
+            quadCount: response.waterSurfaceQuadCount
           },
           lava: {
             positions: new Float32Array(response.lavaPositions),
