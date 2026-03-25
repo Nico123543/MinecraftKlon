@@ -1,0 +1,174 @@
+:root {
+  --hud-bg: rgba(13, 18, 22, 0.58);
+  --hud-border: rgba(255, 255, 255, 0.18);
+  --hud-text: #ecf5ff;
+  --slot-bg: rgba(20, 24, 27, 0.75);
+  --slot-active: #ffd66c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #cde3ef;
+  color: var(--hud-text);
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+#app {
+  position: relative;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  user-select: none;
+}
+
+.perf-panel {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.controls-panel {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 210px;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.control-row input[type='range'] {
+  flex: 1;
+}
+
+.control-value {
+  min-width: 34px;
+  text-align: right;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+}
+
+.fly-toggle,
+.water-toggle {
+  width: 16px;
+  height: 16px;
+}
+
+.hotbar {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.slot {
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  border: 1px solid var(--hud-border);
+  background: var(--slot-bg);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.slot.active {
+  border-color: var(--slot-active);
+  box-shadow: 0 0 0 2px rgba(255, 214, 108, 0.25) inset;
+}
+
+.hints {
+  position: absolute;
+  bottom: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fatal {
+  position: absolute;
+  inset: 12px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(40, 8, 8, 0.86);
+  color: #ffd8d8;
+  border: 1px solid rgba(255, 180, 180, 0.4);
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .controls-panel {
+    right: 8px;
+    left: 8px;
+    min-width: 0;
+    top: 8px;
+  }
+
+  .hints {
+    bottom: 70px;
+    max-width: calc(100% - 24px);
+    white-space: normal;
+  }
+
+  .slot {
+    width: 34px;
+    height: 34px;
+  }
+}

@@ -1,0 +1,218 @@
+So I've seen a few other people around YouTube making Minecraft clones, but they all use shortcuts
+like 3D engines or languages with classes and garbage collection and namespaces and
+things you don't really need.
+But I'm too cool for all that stuff, so I decided to challenge myself and ride my Minecraft
+clone in C. Here's how it went.
+To get started, as all good programmers should, I made a quick Hello World program to check
+if my build system was set up right, and it totally wasn't.
+After that, the first thing I needed to do was to get the Graph Explorer replay set up,
+which means opening up a blank window with nothing in it.
+Thankfully, I have a library called glfw which is most of the heavy lifting for me here.
+So after about an hour's work, I had a blank window open.
+After that, I wrote my input code so I could use the mouse and keyboard later on, and then
+it was finally time to get something to draw to the screen.
+Using just one thing to render in Modern OpenGL is actually pretty involved since you have
+to get things like shaders and buffer objects set up, but I made sure to write the code
+in such a way so that the same code could be used for later on when I needed to start
+drawing cubes.
+After a few failed attempts, I finally got the screen rectangle to drop in the top right,
+and that's going to be the start of the first block.
+But to see the block in 3D, I had to get 3D camera working, so that was my next task.
+This involves some pretty complicated linear algebra that would take me a while to implement
+on my own, so I used another linear algebra library called CGLM to get the camera matrices
+in the right configuration for me.
+And once that was working, the last bit of housekeeping I had to do was getting textures
+to work.
+So I'm not actually a very good pixel artist at all, but I decided in the spirit of the
+game to make some programmer art, and I thought it turned out pretty okay.
+What I was making here was something called the Texture Atlas.
+For the sake of efficiency, games like Minecraft stitch all of the textures for each block
+together into one big image like this, called the Texture Atlas, so that the renderer doesn't
+have to switch between textures every time it draws a different block.
+The renderer uses the Atlas image by taking the offset of the texture for the block being
+drawn in the Atlas, and then mapping its pixel space coordinates in this 256 by 256 pixel
+image into the 0 to 1 UV coordinate space.
+Those are then the texture coordinates that are used for the block.
+Here we can finally see that working with a single grass block.
+From there, my next goal was to get multiple blocks drawn to the screen.
+This involves a bit of infrastructure setup, since it will be really inefficient to treat
+each block as an individual, and there needs to be some sort of subdivision system.
+Minecraft uses a system of chunking, where each chunk is 16 by 16 by 256 blocks, and I
+decided to do something similar.
+After maybe an hour or so, we can see that in action here, with the small issue that
+we're still drawing faces on the inside of the chunk that aren't actually going to be
+visible to the player.
+And you can see from this wireframe renderer how much extra rendering that is, so it's
+pretty important for efficiency with the larger world that those extra faces are removed.
+So I wrote a quick fix for that, where each block face checks if the block's neighbor
+in that direction is solid, and if it is, then the face doesn't render.
+You can see the wireframe looks a lot better now, and we're not drawing anything that the
+player isn't going to see.
+From there on, it was a good hour or so to get the world working, with multiple chunks
+where extra block faces would draw in between chunks.
+And then it's pretty simple to make the world infinite, we just replace chunks that are
+further from the player, with chunks that are nearer to the player as the player moves
+around in the world.
+You can see that in action here, as we fly away from par chunks, they get replaced by
+ones that are nearer to the direction that we're flying.
+And of course, the next thing to do was to put together a few different block types and
+mess around with some world generation.
+The last bit I wanted to finish before making this really looked like Minecraft was making
+block breaking work.
+This is done by casting a ray from where the camera is looking into the world and finding
+the coordinates and face of the first block that that ray intersects with.
+And we can see block breaking at work here in this drawing that I made.
+And to place blocks, now that we know the coordinates and face of the block that the
+camera is looking at, we can just place blocks on that face.
+To test this out, I added a sand block into the game so you can see it at work.
+After that, I could finally really dig into terrain generation.
+Generally, the way procedurally generated games like Minecraft do terrain generation
+is through something called noise, which is a function that takes in a specific number
+of parameters corresponding to its dimension, in our case two, and produces a random but
+smooth map of values in between negative one and one, which can be mapped into terrain features.
+In order to generate more than just a smooth height map, techniques of layering noise like
+octave noise and combined noise can be used to produce more interesting terrain features
+like I made here.
+I decided to follow up for Minecraft Classic on this respect and sample and layer noise
+the same way that it did because I thought it fit the vibe pretty well with the bright
+green grass and everything.
+So I didn't use any real Minecraft lighting in my clone, but there is a quick hack that
+I wrote where I made the northern south faces of each block a different brightness than
+the east and west ones in the top and bottom.
+This was done by giving each vertex some extra color information in addition to its texture
+information, so when OpenGL is calculating the final color for each block vertex, the
+vertex is multiplied by the RGB value of the texture.
+And as you can see here, that makes a big difference to how the terrain looks because
+we can see individual cubes now instead of just big masses of the same block.
+The next thing that the terrain really needed was water.
+Water is actually pretty simple to add to the terrain generation.
+We just pick a water level, I said 64 blocks, and then if the terrain height ends up being
+below that level, we fill the rest up with water to that water level.
+We can see here that that simple addition gives some pretty nice results, but the one
+thing you're probably noticing is that the water isn't translucent and we can't see
+the ocean floor below it.
+Transparency and translucency are notoriously hard problems in 3D graphics, but the first
+thing I had to do to get this right was to start separating out each chunk's mesh into
+the solid geometry and the transparent and translucent geometry.
+That way, I could have two different sets of vertices that I could render differently.
+The key to good looking transparency in 3D graphics is proper ordering, and you can
+see here how order matters.
+We have four translucent squares, in the left side the red one is on top of the green one,
+and on the right side the green one is on top of the red one.
+These different orderings give different colors where the squares overlap, so it's important
+to make sure that the rendering order corresponds to the physical order of the squares.
+This extends out into 3D space, so we need to make sure that the player sees the correct
+ordering of block faces, but that requires drawing all of the translucent faces from
+back to front relative to the player, meaning they need to be sorted.
+This can create issues in Minecraft like games, because there are so many different cube faces
+that it gets pretty expensive to sort them all every time a frame needs to be drawn.
+I made the mistake of trying to take a lot of shortcuts around this for performance reasons,
+and none of them really worked out, so here are a few of the best ones.
+Here we can see no water at all.
+Then a few minutes later, whatever this is, it clearly isn't working though.
+The next attempt gave me an ominous looking black pillar.
+Then a weird sort of void world, and then my personal favorite, whatever this is.
+And as the hours went by, I got pretty close, I got a few things working, and I eventually
+ended up with a half solution like this.
+You can see from the artifacts in the chunk that the chunks are being rendered in the
+wrong order relative to the player, so I needed to start rendering them from back to front
+with sorted by their distance from the camera.
+And you can see here, I did finally get that working, and then everything looked pretty
+good.
+However, the one problem I wasn't actually able to fix, even with the few more hours
+of coding, was that block faces also need to be sorted inside of each chunk, so I had
+to leave that for the next day.
+To start the next day, I gave up on all of my shortcuts and decided on a proper sorting
+algorithm to sort the block faces.
+By sorting every transparent or translucent block face inside of each chunk from back
+to front relative to where the camera was, this solved all of my issues.
+But it did create a few performance problems initially.
+So to combat the performance issues, I came up with a few criteria about when to sort
+the faces in each chunk.
+The faces in the chunk the player is in are sorted whenever the player moves between blocks,
+and the faces in the chunk the player is in in every chunk around that chunk are sorted
+when the player moves between chunks.
+This leads to a good trade off between proper transparency and actual playability.
+And after around an hour of coding, we can finally see that working.
+I also added in some throttling so that only one chunk can change its mesh each frame.
+This helps with making the game feel a little smoother, and it's not really noticeable
+to the player.
+From there, I wanted to add some greenery into the world, so I started to work on trees.
+These are generated by giving every vertical column of blocks that's in a plane's biome
+a five in a thousand chance of generating a tree trunk.
+And some basic randomness like that generates a pretty nice distribution of trees throughout
+the world.
+After that, adding leaves onto trees is as simple as taking the position of the trunk
+and then building a cube of leaves around that.
+There is some extra variance in the corners of the leaves though, just so that the world
+looks a little bit more interesting.
+This is also about where my pixel artistry kind of falls apart, so I spent some extra
+time trying to fix up the leaves texture and make it look a little bit nicer.
+Generating structures like trees though, I started to encounter another really common
+issue with Minecraft like games, which is what should happen when a structure like a
+tree needs to generate leaves across chunk borders, but the chunk hasn't been loaded
+yet.
+This can create issues like we see here, where this tree has sort of just been cut off by
+a chunk border.
+I ended up going with a solution where the world keeps a list of blocks that have been
+set in chunks that haven't been loaded yet, and then when each chunk is loaded, it goes
+through that list and checks if it's had any blocks set before it was generated.
+And once that was solved, the world was filled with some pretty nice looking trees.
+The next thing I wanted to get working to give the world a little more life was animated
+water.
+So the texture atlas that the world uses is just a single static image that's used for
+every different block.
+And even though this atlas is static, there's a trick that we can use to get animations
+for individual blocks.
+The key is to duplicate the texture atlas into the number of animation frames that we
+want and then make each version of the atlas contain a different frame of each animated
+blocks texture in the same location on the atlas.
+If we number the animation frames for the water block on each texture atlas and play
+them in sequence, we can see what's going on.
+By swapping out the texture atlas five times a second like this, the world doesn't need
+to change any meshes when the animation frame changes, only the global texture needs to
+change.
+So after some debugging, I had that working and it looks something like this.
+From there, I thought I'd get flowers into the game, which required some changes into
+the meshing code because flowers are sprites and not complete blocks.
+This means that instead of making a textured cube where there's a flower, the game generates
+a textured X shape instead.
+And after adding flower patches into the world generator, similarly to how trees are done,
+this is what they look like.
+I also decided one flower wasn't quite enough, so I added in a second yellow one.
+So the next thing I did was getting some ore veins into the terrain generation and I decided
+I would add coal and copper.
+These were generated pretty similarly to the way the trees are done, except there's a
+random chance they'll be placed inside of each vertical column of blocks rather than
+on top.
+Their size is determined randomly, and the likelihood that a block will be found decreases
+as the blocks get further from the center of the ore vein.
+So here we can see some copper in the world.
+And then after a little bit of flying around, I also found some coal.
+The next thing I did was to mitigate the pop-in effect you can see when flying around, where
+chunks just sort of come in out of nowhere.
+To do this, I added some distance fog into the world, so the edge of the world will just
+kind of fade off into the sky.
+And again, I had a few funny looking graphical glitches as I was trying to get this to work.
+I think the effect ended up looking pretty nice though, and it adds a lot to how the
+game looks.
+As my time was wrapping up, I added in lava pools with animated textures just like water.
+And I fixed this up, where liquid blocks were the same height as normal blocks.
+It makes water and lava look a little better if they're a little below the height of regular
+blocks.
+I also made water a little more blue to give it that classic Minecraft look, and I really
+failed at trying to get a mountain biome into my game.
+So instead I ended up adding in a couple of new blocks, gravel and clay, which can be
+found and generated randomly at the bottom of the ocean.
+And the final thing I really needed to do was add in block picking, so I made the keys
+one through zero pick different blocks, and gave it a quick try.
+And then added in wooden planks so I could build myself a house.
+And that was pretty much it.
+I considered being able to build a house in my Minecraft clone after a little over 12
+hours of work, a pretty big success.
+So thanks for watching.
+I know it's not exactly the most well-featured version of Minecraft ever made, but I think
+it's pretty good for just a couple of days of work.
+I've included a link to the source code which I put up on GitHub.
+Fair warning though, it is a bit of a mess if you take a look at it.
+Anyway, once again thanks for watching, and goodbye.
